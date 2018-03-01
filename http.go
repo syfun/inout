@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -11,6 +12,34 @@ import (
 
 // JSON is a map, which key is string and value is interface{}.
 type JSON map[string]interface{}
+
+// Response interface
+type Response interface {
+	Write(http.ResponseWriter)
+}
+
+// JSONResponse is json format response
+type JSONResponse struct {
+	Data interface{}
+	Code int
+}
+
+func (jsonRes *JSONResponse) Write(w http.ResponseWriter) {
+	WriteJSON(w, jsonRes.Data, jsonRes.Code)
+}
+
+// TextResponse is text format response
+type TextResponse struct {
+	Data string
+	Code int
+}
+
+func (txtRes *TextResponse) Write(w http.ResponseWriter) {
+	if txtRes.Code != 0 {
+		w.WriteHeader(txtRes.Code)
+	}
+	fmt.Fprintln(w, txtRes.Data)
+}
 
 // WriteJSON write json data to response.
 func WriteJSON(w http.ResponseWriter, v interface{}, code int) {
@@ -33,7 +62,7 @@ func NewRouter() *Router {
 	return &Router{httprouter.New()}
 }
 
-type httpHandler func(http.ResponseWriter, *http.Request) error
+type httpHandler func(http.ResponseWriter, *http.Request) (Response, error)
 
 type httpError struct {
 	error   error
@@ -42,21 +71,34 @@ type httpError struct {
 }
 
 func (he httpError) Error() string {
-	return he.Message
+	return fmt.Sprintf("%s: %s", he.Message, he.error.Error())
 }
 
 func wrapHandler(h httpHandler) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		ctx := context.WithValue(r.Context(), key("params"), ps)
-		if err := h(w, r.WithContext(ctx)); err != nil {
+		resp, err := h(w, r.WithContext(ctx))
+		if err != nil {
 			code := 500
-			if err, ok := err.(httpError); ok {
+			if err, ok := err.(*httpError); ok {
 				code = err.Code
 			}
 			log.Printf("Handle error, %s", err.Error())
 			WriteJSON(w, JSON{"error": err.Error()}, code)
+			return
 		}
+		resp.Write(w)
 	}
+}
+
+func getParams(r *http.Request) httprouter.Params {
+	ctx := r.Context()
+	params := ctx.Value(key("params"))
+	if ps, ok := params.(httprouter.Params); ok {
+		return ps
+	}
+	var ps httprouter.Params
+	return ps
 }
 
 // Get is wrap with httprouter.Router.GET.

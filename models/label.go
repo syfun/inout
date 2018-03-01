@@ -6,15 +6,15 @@ import (
 
 // Label can be user, warehouse, item type
 type Label struct {
-	ID   int64
-	Name string
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
 
 	// Type can be user, warehouse, item type
-	Type string
+	Type string `json:"type"`
 }
 
 // CreateLabel insert label
-func CreateLabel(name, typ string) (*Label, *DBError) {
+func CreateLabel(name, typ string) (*Label, error) {
 	res, err := db.Exec("insert into label (name, type) values (?, ?);", name, typ)
 	if err != nil {
 		return nil, &DBError{err, "insert error"}
@@ -27,7 +27,7 @@ func CreateLabel(name, typ string) (*Label, *DBError) {
 }
 
 // GetLabels query labels
-func GetLabels(typ string) ([]Label, *DBError) {
+func GetLabels(typ string) ([]Label, error) {
 	var (
 		rows *sql.Rows
 		err  error
@@ -40,11 +40,22 @@ func GetLabels(typ string) ([]Label, *DBError) {
 	if err != nil {
 		return nil, &DBError{err, "cannot select from label"}
 	}
-	var labels []Label
+	labels := make([]Label, 0)
 	for rows.Next() {
 		var label Label
 		rows.Scan(&label.ID, &label.Name, &label.Type)
 		labels = append(labels, label)
 	}
 	return labels, nil
+}
+
+// UpdateLabel update label name.
+func UpdateLabel(id int64, name string) (*Label, error) {
+	_, err := db.Exec("update label set name=? where id=?", name, id)
+	if err != nil {
+		return nil, &DBError{err, "cannot update label"}
+	}
+	var typ string
+	db.QueryRow("select type from label where id=?", id).Scan(&typ)
+	return &Label{id, name, typ}, err
 }

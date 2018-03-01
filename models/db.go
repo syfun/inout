@@ -20,7 +20,7 @@ func InitDB(dataSourceName string) {
 	if err := db.Ping(); err != nil {
 		log.Fatal(err)
 	}
-	initTables()
+	// initTables()
 }
 
 // CloseDB expose close db.
@@ -31,19 +31,19 @@ func CloseDB() {
 func initTables() {
 	_, err := db.Exec(`
 		create table if not exists label (
-			id integer not null primary key, 
+			id integer not null primary key,
 			name text, type text);
 		create table if not exists item (
 			id integer not null primary key,
-			name text, type text, specifaction text, unit text, 
+			name text, type text, specifaction text, unit text,
 			push integer, pop integer, now integer, desc text);
 		create table if not exists push (
 			id integer not null primary key,
-			item_id integer references item, 
+			item_id integer references item,
 			time datetime, number integer, warehouse text, abstract text, remark text, user text);
 		create table if not exists pop (
 			id integer not null primary key,
-			item_id integer references item, 
+			item_id integer references item,
 			time datetime, number integer, receiver text,
 			checker text, warehouse text, abstract text, remark text);
 		create table if not exists stock  (
@@ -65,5 +65,5 @@ type DBError struct {
 }
 
 func (dr DBError) Error() string {
-	return fmt.Sprintln(dr.Message, dr.error)
+	return fmt.Sprintf("%s: %s", dr.Message, dr.error.Error())
 }

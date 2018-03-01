@@ -12,9 +12,10 @@ func main() {
 	defer models.CloseDB()
 
 	router := NewRouter()
-	router.Get("/gg", func(w http.ResponseWriter, r *http.Request) error {
-		return httpError{nil, "tttt", 200}
-	})
 
-	log.Fatal(http.ListenAndServe(":8080", router))
+	router.Post("/labels", createLabel)
+	router.Get("/labels", getLabels)
+	router.Post("/labels/:labelID", updateLabel)
+
+	log.Fatal(http.ListenAndServe(":8000", router))
 }

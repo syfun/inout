@@ -8,6 +8,7 @@ import (
 func TestMain(m *testing.M) {
 	os.Remove("./for_test.db")
 	InitDB("./for_test.db")
+	initTables()
 	res := m.Run()
 	os.Remove("./for_test.db")
 	os.Exit(res)
@@ -40,4 +41,15 @@ func TestGetLabels(t *testing.T) {
 		t.Error(err)
 	}
 	t.Log("all", labels)
+}
+
+func TestUpdateLabel(t *testing.T) {
+	label, err := CreateLabel("test1", "user")
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = UpdateLabel(label.ID, "updated")
+	if err != nil {
+		t.Error(err)
+	}
 }
