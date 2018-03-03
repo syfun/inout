@@ -14,7 +14,7 @@ func TestMain(m *testing.M) {
 	os.Exit(res)
 }
 func TestCreateLabel(t *testing.T) {
-	label, err := CreateLabel("test", "user")
+	label, err := Insert("test", "user")
 	if err != nil {
 		t.Error(err)
 	}
@@ -22,11 +22,11 @@ func TestCreateLabel(t *testing.T) {
 }
 
 func TestGetLabels(t *testing.T) {
-	_, err := CreateLabel("test1", "user")
+	_, err := Insert("test1", "user")
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = CreateLabel("test2", "warehouse")
+	_, err = Insert("test2", "warehouse")
 	if err != nil {
 		t.Error(err)
 	}
@@ -44,11 +44,11 @@ func TestGetLabels(t *testing.T) {
 }
 
 func TestUpdateLabel(t *testing.T) {
-	label, err := CreateLabel("test1", "user")
+	label, err := Insert("test1", "user")
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = UpdateLabel(label.ID, "updated")
+	_, err = Update(label.ID, "updated")
 	if err != nil {
 		t.Error(err)
 	}

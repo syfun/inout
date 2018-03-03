@@ -53,6 +53,11 @@ class Label extends Component {
     this.state = { data }
     this.cacheData = data.map(item => ({ ...item }))
   }
+
+  componentDidMount () {
+    // fetch('/push')
+  }
+
   renderColumns (text, record, column) {
     return (
       <EditableCell

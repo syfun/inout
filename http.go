@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"reflect"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/syfun/inout/models"
 )
 
 // JSON is a map, which key is string and value is interface{}.
@@ -120,3 +123,91 @@ func (r *Router) Put(path string, handler httpHandler) {
 func (r *Router) Delete(path string, handler httpHandler) {
 	r.DELETE(path, wrapHandler(handler))
 }
+
+// Patch is wrap with httprouter.Router.PATCH
+func (r *Router) Patch(path string, handler httpHandler) {
+	r.PATCH(path, wrapHandler(handler))
+}
+
+// RestController is restful api controller.
+type RestController struct {
+	Model   models.Model
+	Methods []string
+}
+
+// GetBody get request real bytes.
+func GetBody(r *http.Request) ([]byte, error) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
+	return body, nil
+}
+
+var noneArgs = []reflect.Value{}
+
+// Create create resource.
+func (rest *RestController) Create(w http.ResponseWriter, r *http.Request) (Response, error) {
+	body, err := GetBody(r)
+	if err != nil {
+		return nil, &httpError{err, "cannot get http body", 500}
+	}
+	resource := reflect.New(reflect.TypeOf(rest.Model).Elem())
+	if err = json.Unmarshal(body, resource.Interface()); err != nil {
+		return nil, &httpError{err, "cannot parse body to Label", 400}
+	}
+	res := resource.MethodByName("Insert").Call(noneArgs)
+	err, _ = res[0].Interface().(error)
+	if err != nil {
+		return nil, &httpError{err, "", 500}
+	}
+	return &JSONResponse{resource.Interface(), 201}, nil
+}
+
+// Get get one resource.
+func (rest *RestController) Get(w http.ResponseWriter, r *http.Request) (Response, error) {
+	resource, err := rest.Model.Get(models.NewDBQuery(nil, map[string]string{"id": getParams(r).ByName("id")}))
+	if err != nil {
+		return nil, &httpError{err, "", 500}
+	}
+	return &JSONResponse{resource, 200}, nil
+}
+
+// All get all resources.
+func (rest *RestController) All(w http.ResponseWriter, r *http.Request) (Response, error) {
+	resources, err := rest.Model.All(models.NewDBQuery(r.URL.Query(), nil))
+	if err != nil {
+		return nil, &httpError{err, "", 500}
+	}
+	return &JSONResponse{resources, 200}, nil
+}
+
+// // Update update one resource.
+// func (rest *RestController) Update(w http.ResponseWriter, r *http.Request) (Response, error) {
+// 	body, err := GetBody(r)
+// 	if err != nil {
+// 		return nil, &httpError{err, "cannot get http body", 500}
+// 	}
+// 	resource, err := rest.Model.Get(models.NewDBQuery(nil, map[string]string{"id": getParams(r).ByName("id")}))
+// 	// resource := reflect.New(reflect.TypeOf(rest.Model).Elem())
+// 	if err = json.Unmarshal(body, resource); err != nil {
+// 		return nil, &httpError{err, "cannot parse body to Label", 400}
+// 	}
+// 	res := reflect.ValueOf(resource).MethodByName("Update").Call(noneArgs)
+// 	err, _ = res[0].Interface().(error)
+// 	if err != nil {
+// 		return nil, &httpError{err, "", 500}
+// 	}
+// 	log.Println(resource)
+// 	return &JSONResponse{resource, 200}, nil
+// }
+
+// // Delete delete one resource.
+// func (rest *RestController) Delete(w http.ResponseWriter, r *http.Request) (Response, error) {
+// 	err := rest.Model.Delete(models.NewDBQuery(nil, map[string]string{"id": getParams(r).ByName("id")}))
+// 	if err != nil {
+// 		return nil, &httpError{err, "", 500}
+// 	}
+// 	return &TextResponse{"", 204}, nil
+// }

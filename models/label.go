@@ -13,25 +13,33 @@ type Label struct {
 	Type string `json:"type"`
 }
 
-// CreateLabel insert label
-func CreateLabel(name, typ string) (*Label, error) {
-	res, err := db.Exec("insert into label (name, type) values (?, ?);", name, typ)
+// DefaultLabel for Get and All.
+var DefaultLabel = &Label{}
+
+// Get get label by id.
+func (lb *Label) Get(query *DBQuery) (interface{}, error) {
+	label := &Label{}
+	err := db.QueryRow("select * from label where id=?", query.Get("id")).Scan(
+		&label.ID, &label.Name, &label.Type,
+	)
 	if err != nil {
-		return nil, &DBError{err, "insert error"}
+		return nil, &DBError{err, "label not found"}
 	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return nil, &DBError{err, "cann get last insert id"}
-	}
-	return &Label{id, name, typ}, nil
+	return label, nil
 }
 
-// GetLabels query labels
-func GetLabels(typ string) ([]Label, error) {
+// GetLabel wrap Get.
+func GetLabel(query *DBQuery) (interface{}, error) {
+	return DefaultLabel.Get(query)
+}
+
+// All query labels
+func (lb *Label) All(query *DBQuery) (interface{}, error) {
 	var (
 		rows *sql.Rows
 		err  error
 	)
+	typ := query.Get("type")
 	if typ == "" {
 		rows, err = db.Query("select * from label;")
 	} else {
@@ -49,13 +57,39 @@ func GetLabels(typ string) ([]Label, error) {
 	return labels, nil
 }
 
-// UpdateLabel update label name.
-func UpdateLabel(id int64, name string) (*Label, error) {
-	_, err := db.Exec("update label set name=? where id=?", name, id)
+// AllLabels wrap All.
+func AllLabels(query *DBQuery) (interface{}, error) {
+	return DefaultLabel.All(query)
+}
+
+// Insert insert label
+func (lb *Label) Insert() error {
+	res, err := db.Exec("insert into label (name, type) values (?, ?);", lb.Name, lb.Type)
 	if err != nil {
-		return nil, &DBError{err, "cannot update label"}
+		return &DBError{err, "insert error"}
 	}
-	var typ string
-	db.QueryRow("select type from label where id=?", id).Scan(&typ)
-	return &Label{id, name, typ}, err
+	id, err := res.LastInsertId()
+	if err != nil {
+		return &DBError{err, "cann get last insert id"}
+	}
+	lb.ID = id
+	return nil
+}
+
+// Update update label name.
+func (lb *Label) Update() error {
+	_, err := db.Exec("update label set name=? where id=?", lb.Name, lb.ID)
+	if err != nil {
+		return &DBError{err, "cannot update label"}
+	}
+	return nil
+}
+
+// Delete delete label.
+func (lb *Label) Delete(query *DBQuery) error {
+	_, err := db.Exec("delete from label where id=?", query.Get("id"))
+	if err != nil {
+		return &DBError{err, "cannot delete label"}
+	}
+	return nil
 }

@@ -109,14 +109,21 @@ class Label extends Component {
               columns={this.columns}
             />
           </TabPane>
-          <TabPane tab='仓库' key='2'>
+          <TabPane tab='物品' key='2'>
             <Table
               bordered
               dataSource={this.state.data}
               columns={this.columns}
             />
           </TabPane>
-          <TabPane tab='人员' key='3'>
+          <TabPane tab='仓库' key='3'>
+            <Table
+              bordered
+              dataSource={this.state.data}
+              columns={this.columns}
+            />
+          </TabPane>
+          <TabPane tab='人员' key='4'>
             <Table
               bordered
               dataSource={this.state.data}
