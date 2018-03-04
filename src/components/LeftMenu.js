@@ -34,6 +34,12 @@ class LeftMenu extends Component {
             </NavLink>
           </Menu.Item>
           <Menu.Item key='4'>
+            <NavLink to='/item'>
+              <Icon type='inbox' />
+              <span>物品</span>
+            </NavLink>
+          </Menu.Item>
+          <Menu.Item key='5'>
             <NavLink to='/setting'>
               <Icon type='inbox' />
               <span>设置</span>

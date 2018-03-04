@@ -11,6 +11,7 @@ import Label from './components/Label'
 import Push from './components/Push'
 import Pop from './components/Pop'
 import Stock from './components/Stock'
+import Item from './components/Item'
 
 const { Content, Footer, Sider } = Layout
 
@@ -29,6 +30,7 @@ class App extends Component {
                 <Route exact path='/' component={Push} />
                 <Route path='/pop' component={Pop} />
                 <Route path='/stock' component={Stock} />
+                <Route path='/item' component={Item} />
                 <Route path='/setting' component={Label} />
               </div>
             </Content>
