@@ -1,35 +1,60 @@
 import React, { Component } from 'react'
-import { Table, Input, Popconfirm } from 'antd'
+import { Table, Input, Button, Popconfirm } from 'antd'
 import axios from 'axios'
-
-const data = []
-for (let i = 0; i < 100; i++) {
-  data.push({
-    key: i.toString(),
-    name: `Edrward ${i}`,
-    age: 32,
-    address: `London Park no. ${i}`
-  })
-}
-
-const EditableCell = ({ editable, value, onChange }) => (
-  <div>
-    {editable
-      ? <Input style={{ margin: '-5px 0' }} value={value} onChange={e => onChange(e.target.value)} />
-      : value
-    }
-  </div>
-)
 
 class Item extends Component {
   constructor (props) {
     super(props)
-    this.columns = [{
-      title: 'name',
-      dataIndex: 'name',
-      // width: '25%',
-      render: (text, record) => this.renderColumns(text, record, 'name')
-    }, {
+    this.state = { data: [] }
+    this.columns = this.getColumns([
+      {
+        'title': '物品名称',
+        'dataIndex': 'name',
+        'width': '15%'
+      }, {
+        'title': '物品分类',
+        'dataIndex': 'type',
+        'width': '15%'
+      }, {
+        'title': '物品规格',
+        'dataIndex': 'specification',
+        'width': '15%'
+      }, {
+        'title': '单位',
+        'dataIndex': 'unit',
+        'width': '10%'
+      }, {
+        'title': '入库',
+        'dataIndex': 'push',
+        'width': '5%'
+      }, {
+        'title': '出库',
+        'dataIndex': 'pop',
+        'width': '5%'
+      }, {
+        'title': '剩余',
+        'dataIndex': 'now',
+        'width': '5%'
+      }
+    ])
+  }
+
+  getColumns (options) {
+    let columns = options.map(option => ({
+      title: option.title,
+      dataIndex: option.dataIndex,
+      width: option.width,
+      render: (text, record) => (
+        <div>
+          {record.editable
+            ? <Input style={{ margin: '-5px 0' }} value={text} onChange={e => this.handleChange(e.target.value, record.id, option.dataIndex)} />
+            : text
+          }
+        </div>
+      )
+    })
+    )
+    columns.push({
       title: 'operation',
       dataIndex: 'operation',
       render: (text, record) => {
@@ -38,39 +63,38 @@ class Item extends Component {
           <div className='editable-row-operations'>
             {
               editable
-                ? <span>
-                  <a onClick={() => this.save(record.key)}>Save</a>
-                  <Popconfirm title='Sure to cancel?' onConfirm={() => this.cancel(record.key)}>
-                    <a>Cancel</a>
-                  </Popconfirm>
-                </span>
-                : <a onClick={() => this.edit(record.key)}>Edit</a>
+                ? <div>
+                  <Button type='primary' onClick={() => this.save(record.id)}>保存</Button>
+                  <Button onClick={() => this.cancel(record.id)}>取消</Button>
+                </div>
+                : <Button type='primary' onClick={() => this.edit(record.id)}>编辑</Button>
             }
+            <Popconfirm
+              placement='bottomLeft'
+              title='确定删除吗？'
+              onConfirm={() => this.delete(record.id)}
+              okText='确定' cancelText='取消'
+            >
+              <Button>删除</Button>
+            </Popconfirm>
+
           </div>
         )
       }
-    }]
-    // this.state = { data }
-    this.cacheData = data.map(item => ({ ...item }))
+    })
+    return columns
   }
+
   componentDidMount () {
     axios.get('/items').then(res => {
-      console.log(res)
       this.setState({data: res.data})
+      this.cacheData = res.data.map(item => ({ ...item }))
     })
   }
-  renderColumns (text, record, column) {
-    return (
-      <EditableCell
-        editable={record.editable}
-        value={text}
-        onChange={value => this.handleChange(value, record.key, column)}
-      />
-    )
-  }
+
   handleChange (value, key, column) {
     const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.key)[0]
+    const target = newData.filter(item => key === item.id)[0]
     if (target) {
       target[column] = value
       this.setState({ data: newData })
@@ -78,7 +102,7 @@ class Item extends Component {
   }
   edit (key) {
     const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.key)[0]
+    const target = newData.filter(item => key === item.id)[0]
     if (target) {
       target.editable = true
       this.setState({ data: newData })
@@ -86,29 +110,56 @@ class Item extends Component {
   }
   save (key) {
     const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.key)[0]
+    const target = newData.filter(item => key === item.id)[0]
     if (target) {
-      delete target.editable
-      this.setState({ data: newData })
-      this.cacheData = newData.map(item => ({ ...item }))
+      axios.patch(`/items/${key}`, target).then(
+        () => {
+          delete target.editable
+          this.setState({ data: newData })
+          this.cacheData = newData.map(item => ({ ...item }))
+        }
+      )
     }
   }
   cancel (key) {
     const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.key)[0]
+    const target = newData.filter(item => key === item.id)[0]
     if (target) {
-      Object.assign(target, this.cacheData.filter(item => key === item.key)[0])
+      Object.assign(target, this.cacheData.filter(item => key === item.id)[0])
       delete target.editable
       this.setState({ data: newData })
     }
   }
+
+  handleAdd () {
+    const { data } = this.state
+    const newCell = {
+      id: data.length === 0 ? 1 : data[data.length - 1].id + 1
+    }
+    this.setState({data: [...data, newCell]})
+  }
+
+  delete (key) {
+    axios.delete(`/items/${key}`).then(
+      () => {
+        let newData = [...this.state.data]
+        newData = this.state.data.filter(item => key !== item.id)
+        this.setState({ data: newData })
+        this.cacheData = newData.map(item => ({ ...item }))
+      }
+    )
+  }
   render () {
     return (
-      <Table
-        bordered
-        dataSource={this.state.data}
-        columns={this.columns}
-      />
+      <div>
+        <Button className='editable-add-btn' onClick={this.handleAdd}>添加</Button>
+        <Table
+          bordered
+          dataSource={this.state.data}
+          columns={this.columns}
+          rowKey='id'
+        />
+      </div>
     )
   }
 }
