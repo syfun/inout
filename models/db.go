@@ -257,20 +257,25 @@ func (m *Model) Update(query *DBQuery, data map[string]interface{}) (interface{}
 		}
 		colsMap[tag] = true
 	}
-	cols := make([]string, len(data))
-	vals := make([]interface{}, len(data)+1)
-	index := 0
+	cols := make([]string, 0)
+	vals := make([]interface{}, 0)
 	for k, v := range data {
-		cols[index] = k + "=?"
-		vals[index] = v
-		index++
+		if k == "id" {
+			continue
+		}
+		if _, ok := colsMap[k]; !ok {
+			continue
+		}
+		cols = append(cols, k+"=?")
+		vals = append(vals, v)
 	}
-	vals[index] = query.Get("id")
+	vals = append(vals, query.Get("id"))
 	table := m.Table.TName()
 	stmt := fmt.Sprintf(
 		"update %s set %s where id=?",
 		table, strings.Join(cols, ", "),
 	)
+	fmt.Println(stmt, cols, vals)
 	_, err := db.Exec(stmt, vals...)
 	if err != nil {
 		return nil, &DBError{err, "cannot update " + table}
