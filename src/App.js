@@ -13,31 +13,28 @@ import Pop from './components/Pop'
 import Stock from './components/Stock'
 import Item from './components/Item'
 
-const { Content, Footer, Sider } = Layout
+const { Content, Footer, Header } = Layout
 
 class App extends Component {
   render () {
     return (
       <Router>
-        <Layout>
-          <Sider style={{ overflow: 'auto', height: '100vh', position: 'fixed', left: 0 }}>
-            {/* <div className='logo' /> */}
+        <Layout className='layout'>
+          <Header>
             <LeftMenu />
-          </Sider>
-          <Layout style={{ marginLeft: 200 }}>
-            <Content style={{ margin: '24px 16px 0', overflow: 'initial' }}>
-              <div style={{ padding: 24, background: '#fff', textAlign: 'center' }}>
-                <Route exact path='/' component={Push} />
-                <Route path='/pop' component={Pop} />
-                <Route path='/stock' component={Stock} />
-                <Route path='/item' component={Item} />
-                <Route path='/setting' component={Label} />
-              </div>
-            </Content>
-            <Footer style={{ textAlign: 'center' }}>
+          </Header>
+          <Content style={{ padding: '0 50px', marginTop: '20px' }}>
+            <div style={{ padding: 24, background: '#fff', minHeight: 280, textAlign: 'right' }}>
+              <Route exact path='/' component={Push} />
+              <Route path='/pop' component={Pop} />
+              <Route path='/stock' component={Stock} />
+              <Route path='/item' component={Item} />
+              <Route path='/setting' component={Label} />
+            </div>
+          </Content>
+          <Footer style={{ textAlign: 'center' }}>
         Ant Design ©2016 Created by Ant UED
-            </Footer>
-          </Layout>
+          </Footer>
         </Layout>
       </Router>
     )

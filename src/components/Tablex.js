@@ -1,174 +1,138 @@
 import React, { Component } from 'react'
-import { Table, Input, Button, Popconfirm, InputNumber } from 'antd'
-import axios from 'axios'
+import { Table, Input, Button, Popconfirm, InputNumber, Form, Modal } from 'antd'
 import Selectx from './Selectx'
 
-const EditableCell = ({ editable, value, onChange, option }) => {
-  const type = option.type === undefined ? 'text' : option.type
-  let editor = null
-  if (type === 'number') {
-    editor = <InputNumber min={0} defaultValue={value} onChange={onChange} />
-  } else if (type === 'select') {
-    editor = <Selectx url={option.url} defaultValue={value} onChange={onChange} />
-  } else {
-    editor = <Input style={{ margin: '-5px 0' }} type={type} value={value} onChange={e => onChange(e.target.value)} />
-  }
-  return (
-    <div>
-      {editable ? editor : value}
-    </div>
-  )
-}
+const FormItem = Form.Item
 
-class Tablex extends Component {
+const BaseForm = Form.create()(
+  (props) => {
+    const { visible, onCancel, onOK, update, form } = props
+    const { getFieldDecorator } = form
+    const formItemLayout = {
+      labelCol: { span: 4 },
+      wrapperCol: { span: 14 }
+    }
+    return (
+      <Modal
+        visible={visible}
+        title={update ? '更新物品信息' : '创建物品'}
+        okText={update ? '更新' : '创建'}
+        onCancel={onCancel}
+        onOk={onOK}
+        cancelText='取消'
+      >
+        <Form layout='horizontal'>
+          <FormItem label='名称' {...formItemLayout}>
+            {getFieldDecorator('name', {initialValue: update ? update.name : ''})(
+              <Input />
+            )}
+          </FormItem>
+          <FormItem label='物品分类' {...formItemLayout}>
+            {getFieldDecorator('type')(
+              <Selectx
+                url='/labels?type=itemType'
+                initialValue={update ? update.type : ''}
+              />
+            )}
+          </FormItem>
+          <FormItem label='物品规格' {...formItemLayout}>
+            {getFieldDecorator('specification', {initialValue: update ? update.specification : ''})(
+              <Input />
+            )}
+          </FormItem>
+          <FormItem label='单位' {...formItemLayout}>
+            {getFieldDecorator('unit', {initialValue: update ? update.unit : ''})(
+              <Input />
+            )}
+          </FormItem>
+          <FormItem label='入库' {...formItemLayout}>
+            {getFieldDecorator('push', {initialValue: update ? update.push : 0})(
+              <InputNumber min={0} />
+            )}
+          </FormItem>
+          <FormItem label='出库' {...formItemLayout}>
+            {getFieldDecorator('pop', {initialValue: update ? update.pop : 0})(
+              <InputNumber min={0} />
+            )}
+          </FormItem>
+          <FormItem label='剩余' {...formItemLayout}>
+            {getFieldDecorator('now', {initialValue: update ? update.now : 0})(
+              <InputNumber min={0} />
+            )}
+          </FormItem>
+        </Form>
+      </Modal>
+    )
+  }
+)
+
+class Item extends Component {
   constructor (props) {
     super(props)
-    this.columns = this.getColumns(props.columns)
+
     this.state = {
       data: [],
-      resource: props.resource,
-      query: props.query,
-      extraData: props.extraData
+      visible: false,
+      update: null
     }
-  }
-
-  getColumns (options) {
-    let columns = options.map(option => ({
-      title: option.title,
-      dataIndex: option.dataIndex,
-      width: option.width,
-      render: (text, record) => this.renderColumn(text, record, option)
-    }))
-    columns.push({
+    const {columns, onDelete} = this.props
+    const opertaion = {
       title: '操作',
-      dataIndex: 'operation',
       render: (text, record) => {
-        const { editable } = record
         return (
-          <div className='editable-row-operations'>
-            {
-              editable
-                ? <div>
-                  <Button type='primary' onClick={() => this.save(record.id)}>保存</Button>
-                  <Button onClick={() => this.cancel(record.id)}>取消</Button>
-                </div>
-                : <Button type='primary' onClick={() => this.edit(record.id)}>编辑</Button>
-            }
+          <div>
+            <Button
+              type='primary'
+              style={{ marginRight: '5px' }}
+              onClick={() => this.setState({visible: true, update: record})}
+            >
+              编辑
+            </Button>
             <Popconfirm
               placement='bottomLeft'
               title='确定删除吗？'
-              onConfirm={() => this.delete(record.id)}
+              onConfirm={() => onDelete(record.id)}
               okText='确定' cancelText='取消'
             >
               <Button>删除</Button>
             </Popconfirm>
-
           </div>
         )
       }
-    })
-    return columns
+    }
+    this.columns = [...columns, opertaion]
   }
 
-  componentDidMount () {
-    const { resource, query } = this.state
-    let url = `/${resource}s`
-    if (query !== undefined) {
-      url += `?${query}`
-    }
-    axios.get(url).then(res => {
-      this.setState({data: res.data})
-      this.cacheData = res.data.map(item => ({ ...item }))
-    })
+  handleCancel = () => {
+    this.setState({visible: false})
   }
 
-  renderColumn = (text, record, option) => (
-    <EditableCell
-      editable={record.editable}
-      value={text}
-      option={option}
-      onChange={value => this.handleChange(value, record.id, option.dataIndex)}
-    />
-  )
-
-  handleChange (value, key, column) {
-    console.log(value)
-    const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.id)[0]
-    if (target) {
-      target[column] = value
-      this.setState({ data: newData })
-    }
-  }
-  edit (key) {
-    const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.id)[0]
-    if (target) {
-      target.editable = true
-      this.setState({ data: newData })
-    }
-  }
-  save (key) {
-    const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.id)[0]
-    if (target) {
-      if (target.add !== undefined && target.add) {
-        axios.post(`/${this.state.resource}s`, target).then(
-          res => {
-            Object.assign(target, res.data)
-            delete target.editable
-            this.setState({data: newData})
-            this.cacheData = newData.map(item => ({ ...item }))
-          }
-        )
-      } else {
-        axios.patch(`/${this.state.resource}s/${key}`, target).then(
-          () => {
-            delete target.editable
-            this.setState({ data: newData })
-            this.cacheData = newData.map(item => ({ ...item }))
-          }
-        )
-      }
-    }
-  }
-  cancel (key) {
-    const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.id)[0]
-    if (target) {
-      Object.assign(target, this.cacheData.filter(item => key === item.id)[0])
-      delete target.editable
-      this.setState({ data: newData })
-    }
+  showModal = () => {
+    this.setState({visible: true})
   }
 
-  handleAdd = () => {
-    const { data, extraData } = this.state
-    let newCell = {
-      id: data.length === 0 ? 1 : data[data.length - 1].id + 1,
-      editable: true,
-      add: true
-    }
-    if (extraData !== undefined) {
-      Object.assign(newCell, extraData)
-    }
-    this.setState({data: [...data, newCell]})
+  saveFormRef = (form) => {
+    this.form = form
   }
 
-  delete (key) {
-    axios.delete(`/${this.state.resource}s/${key}`).then(
-      () => {
-        let newData = [...this.state.data]
-        newData = this.state.data.filter(item => key !== item.id)
-        this.setState({ data: newData })
-        this.cacheData = newData.map(item => ({ ...item }))
-      }
-    )
-  }
   render () {
+    const {update, visible} = this.state
+    const {onCreate, onUpdate} = this.props
     return (
       <div>
-        <Button className='editable-add-btn' onClick={this.handleAdd}>添加</Button>
+        <Button
+          className='editable-add-btn'
+          onClick={() => this.setState({visible: true, update: null})}
+        >
+          添加
+        </Button>
+        <BaseForm
+          ref={this.saveFormRef}
+          visible={visible}
+          onCancel={this.handleCancel}
+          onOK={update ? onUpdate : onCreate}
+          update={update}
+        />
         <Table
           bordered
           dataSource={this.state.data}
@@ -180,4 +144,4 @@ class Tablex extends Component {
   }
 }
 
-export default Tablex
+export default Item

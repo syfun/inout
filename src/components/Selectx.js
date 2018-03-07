@@ -6,23 +6,20 @@ const Option = Select.Option
 class Selectx extends Component {
   constructor (props) {
     super(props)
-    const { url, defaultValue } = props
     this.state = {
-      data: [],
-      url,
-      defaultValue
+      data: []
     }
   }
   componentDidMount () {
-    axios.get(this.state.url).then(
+    axios.get(this.props.url).then(
       res => this.setState({data: res.data})
     )
   }
   render () {
-    const {data, defaultValue} = this.state
+    const {data} = this.state
     return (
       <div>
-        <Select defaultValue={defaultValue} style={{ width: 120 }}>
+        <Select defaultValue={this.props.initialValue} onChange={this.props.onChange}>
           {
             data.map(item => (
               <Option key={item.name}>{item.name}</Option>
