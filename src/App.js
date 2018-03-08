@@ -7,7 +7,7 @@ import {
 import './App.css'
 import { Layout } from 'antd'
 import LeftMenu from './components/LeftMenu'
-import Label from './components/Label'
+import Setting from './components/Setting'
 import Push from './components/Push'
 import Pop from './components/Pop'
 import Stock from './components/Stock'
@@ -29,7 +29,7 @@ class App extends Component {
               <Route path='/pop' component={Pop} />
               <Route path='/stock' component={Stock} />
               <Route path='/item' component={Item} />
-              <Route path='/setting' component={Label} />
+              <Route path='/setting' component={Setting} />
             </div>
           </Content>
           <Footer style={{ textAlign: 'center' }}>

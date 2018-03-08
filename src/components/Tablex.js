@@ -1,12 +1,13 @@
 import React, { Component } from 'react'
 import { Table, Input, Button, Popconfirm, InputNumber, Form, Modal } from 'antd'
+import axios from 'axios'
 import Selectx from './Selectx'
 
 const FormItem = Form.Item
 
 const BaseForm = Form.create()(
   (props) => {
-    const { visible, onCancel, onOK, update, form } = props
+    const { visible, onCancel, onOK, update, form, columns } = props
     const { getFieldDecorator } = form
     const formItemLayout = {
       labelCol: { span: 4 },
@@ -22,51 +23,38 @@ const BaseForm = Form.create()(
         cancelText='取消'
       >
         <Form layout='horizontal'>
-          <FormItem label='名称' {...formItemLayout}>
-            {getFieldDecorator('name', {initialValue: update ? update.name : ''})(
-              <Input />
-            )}
-          </FormItem>
-          <FormItem label='物品分类' {...formItemLayout}>
-            {getFieldDecorator('type')(
-              <Selectx
-                url='/labels?type=itemType'
-                initialValue={update ? update.type : ''}
-              />
-            )}
-          </FormItem>
-          <FormItem label='物品规格' {...formItemLayout}>
-            {getFieldDecorator('specification', {initialValue: update ? update.specification : ''})(
-              <Input />
-            )}
-          </FormItem>
-          <FormItem label='单位' {...formItemLayout}>
-            {getFieldDecorator('unit', {initialValue: update ? update.unit : ''})(
-              <Input />
-            )}
-          </FormItem>
-          <FormItem label='入库' {...formItemLayout}>
-            {getFieldDecorator('push', {initialValue: update ? update.push : 0})(
-              <InputNumber min={0} />
-            )}
-          </FormItem>
-          <FormItem label='出库' {...formItemLayout}>
-            {getFieldDecorator('pop', {initialValue: update ? update.pop : 0})(
-              <InputNumber min={0} />
-            )}
-          </FormItem>
-          <FormItem label='剩余' {...formItemLayout}>
-            {getFieldDecorator('now', {initialValue: update ? update.now : 0})(
-              <InputNumber min={0} />
-            )}
-          </FormItem>
+          {
+            columns.map(column => {
+              const { name, type } = column
+              let inner = null
+              if (type === undefined || type === 'text') {
+                inner = <Input />
+              } else if (type === 'select') {
+                inner = (
+                  <Selectx
+                    url={column.url}
+                    initialValue={update ? update[name] : ''}
+                  />
+                )
+              } else if (type === 'number') {
+                inner = <InputNumber min={0} />
+              }
+              return (
+                <FormItem label='名称' {...formItemLayout}>
+                  {getFieldDecorator(name, {initialValue: update ? update[name] : ''})(
+                    {inner}
+                  )}
+                </FormItem>
+              )
+            })
+          }
         </Form>
       </Modal>
     )
   }
 )
 
-class Item extends Component {
+class Tablex extends Component {
   constructor (props) {
     super(props)
 
@@ -103,6 +91,14 @@ class Item extends Component {
     this.columns = [...columns, opertaion]
   }
 
+  componentDidMount () {
+    axios.get(`/${this.props.resource}`).then(
+      res => {
+        this.setState({data: res.data})
+      }
+    )
+  }
+
   handleCancel = () => {
     this.setState({visible: false})
   }
@@ -132,6 +128,7 @@ class Item extends Component {
           onCancel={this.handleCancel}
           onOK={update ? onUpdate : onCreate}
           update={update}
+          columns={this.props.columns}
         />
         <Table
           bordered
@@ -144,4 +141,4 @@ class Item extends Component {
   }
 }
 
-export default Item
+export default Tablex

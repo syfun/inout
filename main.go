@@ -22,5 +22,10 @@ func main() {
 		"label", AllOptions,
 	})
 
+	router.Register(&RestController{
+		&models.Model{Table: &models.Push{}},
+		"push", AllOptions,
+	})
+
 	log.Fatal(http.ListenAndServe(":8000", router))
 }

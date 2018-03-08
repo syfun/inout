@@ -15,7 +15,7 @@ const ItemTypeForm = Form.create()(
     return (
       <Modal
         visible={visible}
-        title={update ? '更新' : '创建'}
+        title={update ? '更新物品类型信息' : '创建物品类型'}
         okText={update ? '更新' : '创建'}
         onCancel={onCancel}
         onOk={onOK}
@@ -71,7 +71,7 @@ class ItemType extends Component {
   ]
 
   componentDidMount () {
-    axios.get(`/labels?type=${this.props.type}`).then(res => {
+    axios.get('/labels?type=itemType').then(res => {
       this.setState({data: res.data})
       this.cacheData = res.data.map(item => ({ ...item }))
     })
@@ -84,7 +84,7 @@ class ItemType extends Component {
   handleCreate = () => {
     const form = this.form
     form.validateFields((_, values) => {
-      values.type = this.props.type
+      values.type = 'itemType'
       axios.post('/labels', values).then(
         res => {
           let data = [...this.state.data]
