@@ -187,11 +187,11 @@ func (rest *RestController) Create(w http.ResponseWriter, r *http.Request) (Resp
 	if err != nil {
 		return nil, &httpError{err, "cannot get http body", 500}
 	}
-	resource := reflect.New(reflect.TypeOf(rest.Model.Table).Elem()).Elem()
-	if err = json.Unmarshal(body, resource.Addr().Interface()); err != nil {
+	resource := reflect.New(reflect.TypeOf(rest.Model.Table).Elem()).Elem().Addr()
+	if err = json.Unmarshal(body, resource.Interface()); err != nil {
 		return nil, &httpError{err, "cannot parse body", 400}
 	}
-	res, err := rest.Model.Insert(resource)
+	res, err := rest.Model.Insert(resource.Interface())
 	if err != nil {
 		return nil, &httpError{err, "", 500}
 	}

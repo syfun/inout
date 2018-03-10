@@ -27,5 +27,15 @@ func main() {
 		"push", AllOptions,
 	})
 
+	router.Register(&RestController{
+		&models.Model{Table: &models.Pop{}},
+		"pop", AllOptions,
+	})
+
+	router.Register(&RestController{
+		&models.Model{Table: &models.Stock{}},
+		"stock", AllOptions,
+	})
+
 	log.Fatal(http.ListenAndServe(":8000", router))
 }

@@ -6,24 +6,19 @@ import (
 	"log"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3" // sqlite driver
 )
 
-var db *sql.DB
+var db *sqlx.DB
 
 // InitDB init database connection.
 func InitDB(dataSourceName string) {
-	var err error
-	db, err = sql.Open("sqlite3", dataSourceName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := db.Ping(); err != nil {
-		log.Fatal(err)
-	}
-	// initTables()
+	db = sqlx.MustConnect("sqlite3", dataSourceName)
+	initTables()
 }
 
 // CloseDB expose close db.
@@ -35,27 +30,31 @@ func initTables() {
 	_, err := db.Exec(`
 		create table if not exists label (
 			id integer not null primary key,
-			name text, type text);
+			name text, type text
+		);
 		create table if not exists item (
 			id integer not null primary key,
 			name text, type text, specification text, unit text,
-			push integer, pop integer, now integer, desc text);
+			push integer, pop integer, now integer, desc text
+		);
 		create table if not exists push (
 			id integer not null primary key,
 			item_id integer references item,
-			time datetime, number integer, warehouse text, abstract text, remark text, user text);
+			time text, number integer, warehouse text, abstract text, remark text, user text);
 		create table if not exists pop (
 			id integer not null primary key,
 			item_id integer references item,
-			time datetime, number integer, receiver text,
+			time text, number integer, receiver text,
 			checker text, warehouse text, abstract text, remark text);
 		create table if not exists stock  (
 			id integer not null primary key,
 			item_id integer references item,
 			warehouse text, push integer, pop integer, now integer, desc text);
-		create index push_item_index on push(item_id);
-		create index pop_item_index on pop(item_id);
-		create index stock_item_index on stock(item_id);`)
+		create unique index if not exists item_name_unique on item(name);
+		create unique index if not exists label_name_type_unique on label(name, type);
+		create index if not exists push_item_index on push(item_id);
+		create index if not exists pop_item_index on pop(item_id);
+		create index if not exists stock_item_index on stock(item_id);`)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -81,6 +80,18 @@ func (dq *DBQuery) Length() int {
 	return len(dq.Values)
 }
 
+func (dq *DBQuery) genNamedVars() ([]string, map[string]interface{}) {
+	index := 0
+	vars := make([]string, dq.Length())
+	bindMap := make(map[string]interface{})
+	for key := range dq.Values {
+		vars[index] = key + "=:" + key
+		bindMap[key] = dq.Get(key)
+		index++
+	}
+	return vars, bindMap
+}
+
 // NewDBQuery create new DBQuery.
 func NewDBQuery(values url.Values, kv map[string]string) *DBQuery {
 	if values == nil {
@@ -97,8 +108,12 @@ func NewDBQuery(values url.Values, kv map[string]string) *DBQuery {
 
 // Table interface.
 type Table interface {
-	// TName for table name
-	TName() string
+	insertStmt() string
+	getStmt() string
+	allStmt() string
+	updateStmt() string
+	deleteStmt() string
+	columns() map[string]interface{}
 }
 
 // Model struct.
@@ -108,76 +123,37 @@ type Model struct {
 
 // Insert insert into table.
 func (m *Model) Insert(resource interface{}) (interface{}, error) {
-	val, _ := resource.(reflect.Value)
-	typ := val.Type()
-	num := typ.NumField()
-	cols := make([]string, num-1)
-	vals := make([]interface{}, num-1)
-	index := 0
-
-	for i := 0; i < num; i++ {
-		field := typ.Field(i)
-		tag := field.Tag.Get("column")
-		if field.Name == "ID" || tag == "" {
-			continue
-		}
-
-		cols[index] = tag
-		vals[index] = val.Field(i).Interface()
-		index++
-	}
-
-	stmt := fmt.Sprintf(
-		"insert into %s (%s) values (%s);",
-		m.Table.TName(),
-		strings.Join(cols, ","),
-		strings.TrimRight(strings.Repeat("?, ", len(cols)), ", "),
+	var (
+		result sql.Result
+		err    error
 	)
-	res, err := db.Exec(stmt, vals...)
+	if _, ok := reflect.TypeOf(m.Table).MethodByName("Insert"); !ok {
+		result, err = db.NamedExec(m.Table.insertStmt(), resource)
+		if err != nil {
+			return nil, &DBError{err, "insert error"}
+		}
+	} else {
+		rst := reflect.ValueOf(m.Table).MethodByName("Insert").Call(
+			[]reflect.Value{reflect.ValueOf(resource)},
+		)
+		if !rst[1].IsNil() {
+			return nil, &DBError{rst[1].Interface().(error), "insert error"}
+		}
+		result = rst[0].Interface().(sql.Result)
+	}
 
-	if err != nil {
-		return nil, &DBError{err, fmt.Sprintf("insert %s error", m.Table)}
-	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return nil, &DBError{err, "cann get last insert id"}
-	}
-	val.FieldByName("ID").SetInt(id)
-	return val.Interface(), nil
+	id, _ := result.LastInsertId()
+	// reflect.ValueOf(resource).Elem().FieldByName("ID").SetInt(id)
+	resource, _ = m.Get(NewDBQuery(nil, map[string]string{"id": strconv.FormatInt(id, 10)}))
+	return resource, nil
 }
 
 // Get query one from table.
 func (m *Model) Get(query *DBQuery) (interface{}, error) {
-	table := m.Table.TName()
-	stmt := fmt.Sprintf("select * from %s where id=?", table)
-	rows, err := db.Query(stmt, query.Get("id"))
+	resource := reflect.New(reflect.TypeOf(m.Table).Elem()).Elem().Addr()
+	err := db.Get(resource.Interface(), m.Table.getStmt(), query.Get("id"))
 	if err != nil {
-		return nil, &DBError{err, "query error from " + table}
-	}
-	defer rows.Close()
-
-	cols, _ := rows.Columns()
-	dest := make([]interface{}, len(cols))
-	colsMap := make(map[string]int)
-	for i, c := range cols {
-		colsMap[c] = i
-	}
-	resource := reflect.New(reflect.TypeOf(m.Table).Elem()).Elem()
-	typ := resource.Type()
-	for i := 0; i < typ.NumField(); i++ {
-		colName := typ.Field(i).Tag.Get("column")
-		colIndex, ok := colsMap[colName]
-		if !ok {
-			return nil, fmt.Errorf("%s has no column %s", table, colName)
-		}
-		dest[colIndex] = resource.Field(i).Addr().Interface()
-	}
-	if !rows.Next() {
-		return nil, fmt.Errorf("%s not found", table)
-	}
-	err = rows.Scan(dest...)
-	if err != nil {
-		return nil, &DBError{err, "scan error"}
+		return nil, &DBError{err, "query single error"}
 	}
 	return resource.Interface(), nil
 }
@@ -185,111 +161,70 @@ func (m *Model) Get(query *DBQuery) (interface{}, error) {
 // All query all from table.
 func (m *Model) All(query *DBQuery) (interface{}, error) {
 	var (
-		rows   *sql.Rows
 		err    error
 		length = query.Length()
-		table  = m.Table.TName()
 	)
+	sliceType := reflect.SliceOf(reflect.TypeOf(m.Table))
+	resources := reflect.New(sliceType)
+
+	stmt := m.Table.allStmt()
 	if length == 0 {
-		rows, err = db.Query(fmt.Sprintf("select * from %s;", table))
+		err = db.Select(resources.Interface(), stmt)
 	} else {
-		vals := make([]interface{}, length)
-		cols := make([]string, length)
-		index := 0
-		for key := range query.Values {
-			cols[index] = key + "=?"
-			vals[index] = query.Get(key)
-			index++
-		}
-		stmt := fmt.Sprintf(
-			"select * from %s where %s;",
-			table, strings.Join(cols, " and "),
-		)
-		rows, err = db.Query(stmt, vals...)
+		vars, bindMap := query.genNamedVars()
+		stmt = fmt.Sprintf("%s where %s", stmt, strings.Join(vars, " and "))
+		prepared, _ := db.PrepareNamed(stmt)
+		err = prepared.Select(resources.Interface(), bindMap)
 	}
 
 	if err != nil {
-		return nil, &DBError{err, "cannot query item"}
+		return nil, &DBError{err, "query all error"}
 	}
-	defer rows.Close()
-
-	cols, _ := rows.Columns()
-	colsMap := make(map[string]int)
-	for i, c := range cols {
-		colsMap[c] = i
-	}
-	indexes := make([]int, len(cols))
-	typ := reflect.TypeOf(m.Table).Elem()
-	for i := 0; i < typ.NumField(); i++ {
-		colName := typ.Field(i).Tag.Get("column")
-		colIndex, ok := colsMap[colName]
-		if !ok {
-			return nil, fmt.Errorf("%s has no column %s", table, colName)
-		}
-		indexes[i] = colIndex
-	}
-
-	resources := make([]interface{}, 0)
-	for rows.Next() {
-		resource := reflect.New(reflect.TypeOf(m.Table).Elem()).Elem()
-		dest := make([]interface{}, len(cols))
-		for i, index := range indexes {
-			dest[index] = resource.Field(i).Addr().Interface()
-		}
-		if err = rows.Scan(dest...); err != nil {
-			return nil, &DBError{err, "scan error"}
-		}
-		resources = append(resources, resource.Interface())
-	}
-	return resources, nil
+	return resources.Interface(), nil
 }
 
 // Update update table.
 func (m *Model) Update(query *DBQuery, data map[string]interface{}) (interface{}, error) {
-	colsMap := make(map[string]bool)
-	typ := reflect.TypeOf(m.Table).Elem()
+	var resource interface{}
+	if _, ok := reflect.TypeOf(m.Table).MethodByName("Update"); !ok {
+		index := 0
+		namedVars := make([]string, 0)
+		colsMap := m.Table.columns()
+		for key := range data {
+			if _, ok := colsMap[key]; !ok {
+				continue
+			}
+			namedVars = append(namedVars, key+"=:"+key)
+			index++
+		}
+		if len(namedVars) != 0 {
+			data["id"] = query.Get("id")
+			stmt := fmt.Sprintf("%s set %s where id=:id",
+				m.Table.updateStmt(), strings.Join(namedVars, ", "))
+			_, err := db.NamedExec(stmt, data)
+			if err != nil {
+				return nil, &DBError{err, "update error"}
+			}
+		}
+		resource, _ = m.Get(query)
+	} else {
+		rst := reflect.ValueOf(m.Table).MethodByName("Update").Call(
+			[]reflect.Value{reflect.ValueOf(query), reflect.ValueOf(data)},
+		)
+		if !rst[1].IsNil() {
+			return nil, &DBError{rst[1].Interface().(error), "update error"}
+		}
+		resource = rst[0].Interface()
+	}
 
-	for i := 0; i < typ.NumField(); i++ {
-		field := typ.Field(i)
-		tag := field.Tag.Get("column")
-		if field.Name == "ID" || tag == "" {
-			continue
-		}
-		colsMap[tag] = true
-	}
-	cols := make([]string, 0)
-	vals := make([]interface{}, 0)
-	for k, v := range data {
-		if k == "id" {
-			continue
-		}
-		if _, ok := colsMap[k]; !ok {
-			continue
-		}
-		cols = append(cols, k+"=?")
-		vals = append(vals, v)
-	}
-	vals = append(vals, query.Get("id"))
-	table := m.Table.TName()
-	stmt := fmt.Sprintf(
-		"update %s set %s where id=?",
-		table, strings.Join(cols, ", "),
-	)
-	fmt.Println(stmt, cols, vals)
-	_, err := db.Exec(stmt, vals...)
-	if err != nil {
-		return nil, &DBError{err, "cannot update " + table}
-	}
-	resource, _ := m.Get(query)
 	return resource, nil
 }
 
 // Delete delete from table.
 func (m *Model) Delete(query *DBQuery) error {
-	table := m.Table.TName()
-	_, err := db.Exec(fmt.Sprintf("delete from %s where id=?", table), query.Get("id"))
+	_, err := db.Exec(m.Table.deleteStmt(), query.Get("id"))
 	if err != nil {
-		return &DBError{err, "cannot delete from " + table}
+		return &DBError{err, "delete error"}
 	}
 	return nil
 }
