@@ -1,5 +1,9 @@
 package models
 
+import (
+	"strconv"
+)
+
 // Item ...
 type Item struct {
 	ID            int64  `json:"id"`
@@ -13,26 +17,48 @@ type Item struct {
 	Desc          string `json:"desc"`
 }
 
-func (*Item) columns() map[string]interface{} {
-	return stringSliceToMap([]string{"id", "name", "type", "specification", "unit", "push", "pop", "now", "desc"})
+// Create ...
+func (it *Item) Create(t Table) (Table, error) {
+	rst, err := Create("insert into item (name, type, specification, unit, push, pop, now, desc) values (:name, :type, :specification, :unit, :push, :pop, :now, :desc)", t)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := rst.LastInsertId()
+	var item Item
+	err = it.Get(&item, NewDBQuery(nil, map[string]string{"id": strconv.FormatInt(id, 10)}))
+	return &item, err
 }
 
-func (*Item) insertStmt() string {
-	return `insert into item (name, type, specification, unit, push, pop, now, desc) values (:name, :type, :specification, :unit, :push, :pop, :now, :desc);`
+var itemCols = stringSliceToMap("item", []string{
+	"id", "name", "type", "specification", "unit", "push", "pop", "now", "desc",
+})
+
+// Update ..
+func (it *Item) Update(query *DBQuery, data map[string]interface{}) (Table, error) {
+	err := Update("update item set %s where id=:id", query, data, itemCols)
+	if err != nil {
+		return nil, err
+	}
+	var item Item
+	err = it.Get(&item, query)
+	return &item, err
 }
 
-func (*Item) getStmt() string {
-	return `select * from item where id=?`
+// Get ...
+func (*Item) Get(dest interface{}, query *DBQuery) error {
+	return Get(dest, "select * from item where id=?", query)
 }
 
-func (*Item) allStmt() string {
-	return `select * from item`
+// List ...
+func (*Item) List(dest interface{}, query *DBQuery) (int64, error) {
+	err := List(dest, "select * from item", query, itemCols)
+	if err != nil {
+		return 0, err
+	}
+	return Count("select count(*) from item", query, itemCols)
 }
 
-func (*Item) updateStmt() string {
-	return "update item"
-}
-
-func (*Item) deleteStmt() string {
-	return "delete from item where id=?"
+// Delete ...
+func (*Item) Delete(query *DBQuery) error {
+	return Delete("delete from item", query)
 }

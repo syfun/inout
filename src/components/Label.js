@@ -72,8 +72,7 @@ class ItemType extends Component {
 
   componentDidMount () {
     axios.get(`/labels?type=${this.props.type}`).then(res => {
-      this.setState({data: res.data})
-      this.cacheData = res.data.map(item => ({ ...item }))
+      this.setState({data: res.data || []})
     })
   }
 
@@ -89,6 +88,7 @@ class ItemType extends Component {
         res => {
           let data = [...this.state.data]
           data.push(res.data)
+          form.resetFields()
           this.setState({ data, visible: false })
         }
       )
@@ -104,6 +104,7 @@ class ItemType extends Component {
           const data = [...this.state.data]
           const target = data.filter(item => itemID === item.id)[0]
           Object.assign(target, res.data)
+          form.resetFields()
           this.setState({ data, visible: false })
         }
       )

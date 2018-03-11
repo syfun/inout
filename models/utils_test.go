@@ -11,3 +11,16 @@ func TestStringSliceToMap(t *testing.T) {
 	}
 	t.Log(m)
 }
+
+func TestMapToStruct(t *testing.T) {
+	var s struct {
+		Name string
+		Age  int64
+	}
+	m := map[string]interface{}{
+		"Name": "Jack",
+		"age":  29,
+	}
+	MapToStruct(m, &s)
+	t.Log(s)
+}

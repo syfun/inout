@@ -31,3 +31,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/jmoiron/sqlx"
+
+[[constraint]]
+  name = "github.com/gin-gonic/gin"
+  version = "0.5.0"

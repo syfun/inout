@@ -2,6 +2,16 @@
 
 
 [[projects]]
+  name = "github.com/gin-gonic/gin"
+  packages = [
+    ".",
+    "binding",
+    "render"
+  ]
+  revision = "50e7e427300a7eeeb299a4cd5bc1ebfa04d48528"
+  version = "v0.5"
+
+[[projects]]
   branch = "master"
   name = "github.com/jmoiron/sqlx"
   packages = [
@@ -25,6 +35,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2529b35185ffd75f0c770f6d09c3b493a7e9aed43553f1ca249b98db05a12188"
+  inputs-digest = "822a9aa910f9a39be48634c72a02de2fa5bb9caca75b7fac8ead0ac475f09bad"
   solver-name = "gps-cdcl"
   solver-version = 1

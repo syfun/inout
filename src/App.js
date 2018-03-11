@@ -1,7 +1,8 @@
 import React, { Component } from 'react'
 import {
   BrowserRouter as Router,
-  Route
+  Route,
+  Redirect
 } from 'react-router-dom'
 
 import './App.css'
@@ -25,7 +26,8 @@ class App extends Component {
           </Header>
           <Content style={{ padding: '0 50px', marginTop: '20px' }}>
             <div style={{ padding: 24, background: '#fff', minHeight: 280, textAlign: 'right' }}>
-              <Route exact path='/' component={Push} />
+              <Redirect from='/' to='/push' />
+              <Route path='/push' component={Push} />
               <Route path='/pop' component={Pop} />
               <Route path='/stock' component={Stock} />
               <Route path='/item' component={Item} />
@@ -33,7 +35,7 @@ class App extends Component {
             </div>
           </Content>
           <Footer style={{ textAlign: 'center' }}>
-        Ant Design ©2016 Created by Ant UED
+        仓库入库出库系统 ©2018 Created by syfun (sunyu418@gmail.com)
           </Footer>
         </Layout>
       </Router>

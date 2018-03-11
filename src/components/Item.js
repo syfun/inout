@@ -1,5 +1,5 @@
 import React, { Component } from 'react'
-import { Table, Input, Button, Popconfirm, InputNumber, Form, Modal } from 'antd'
+import { Table, Input, Button, Popconfirm, InputNumber, Form, Modal, Row, Col } from 'antd'
 import axios from 'axios'
 import Selectx from './Selectx'
 
@@ -29,10 +29,9 @@ const ItemForm = Form.create()(
             )}
           </FormItem>
           <FormItem label='物品分类' {...formItemLayout}>
-            {getFieldDecorator('type')(
+            {getFieldDecorator('type', {initialValue: update ? update.type : ''})(
               <Selectx
                 url='/labels?type=itemType'
-                initialValue={update ? update.type : ''}
               />
             )}
           </FormItem>
@@ -71,7 +70,9 @@ class Item extends Component {
   state = {
     data: [],
     visible: false,
-    update: null
+    update: {},
+    pagination: {},
+    filter: {}
   }
 
   columns = [
@@ -130,10 +131,35 @@ class Item extends Component {
   ]
 
   componentDidMount () {
-    axios.get('/items').then(res => {
-      this.setState({data: res.data})
-      this.cacheData = res.data.map(item => ({ ...item }))
+    this.fetch()
+  }
+
+  fetch = () => {
+    axios.get('/items?page=1&page_size=10', {
+      params: this.state.filter
+    }).then(res => {
+      this.setState({
+        data: res.data || [],
+        pagination: {
+          pageSize: 10,
+          total: parseInt(res.headers.total, 10),
+          showTotal: total => `共 ${res.headers.total} 条`
+        }
+      })
     })
+  }
+
+  handlePageChange = (pagination, filters, sorter) => {
+    const pager = this.state.pagination
+    pager.current = pagination.current
+    axios.get(`/items?page=${pager.current}&page_size=${pager.pageSize}`).then(
+      res => {
+        this.setState({
+          data: res.data || [],
+          pagination: pager
+        })
+      }
+    )
   }
 
   handleCancel = () => {
@@ -147,7 +173,10 @@ class Item extends Component {
         res => {
           let data = [...this.state.data]
           data.push(res.data)
-          this.setState({ data, visible: false })
+          form.resetFields()
+          let pager = this.state.pagination
+          pager.total += 1
+          this.setState({ data, visible: false, pagination: pager })
         }
       )
     })
@@ -163,6 +192,7 @@ class Item extends Component {
           const target = data.filter(item => itemID === item.id)[0]
           Object.assign(target, res.data)
           this.setState({ data, visible: false })
+          form.resetFields()
         }
       )
     })
@@ -173,7 +203,9 @@ class Item extends Component {
       res => {
         let data = [...this.state.data]
         data = data.filter(item => key !== item.id)
-        this.setState({ data, visible: false })
+        const pager = this.state.pagination
+        pager.total -= 1
+        this.setState({ data, visible: false, pagination: pager })
       }
     )
   }
@@ -186,16 +218,46 @@ class Item extends Component {
     this.form = form
   }
 
+  setFilter = (key, value) => {
+    const filter = this.state.filter
+    if (value === '') {
+      delete filter[key]
+    } else {
+      Object.assign(filter, {[key]: value})
+    }
+    this.setState(filter)
+  }
+
   render () {
-    const {update, visible} = this.state
+    const {update, visible, pagination} = this.state
     return (
       <div>
-        <Button
-          className='editable-add-btn'
-          onClick={() => this.setState({visible: true, update: null})}
-        >
+        <Row>
+          <Col span={4} offset={16}>
+            <Input
+              placeholder='物品名称'
+              onChange={(e) => this.setFilter('name', e.target.value)}
+              onPressEnter={() => this.fetch()}
+            />
+          </Col>
+          <Col span={2}>
+            <Button
+              className='editable-add-btn'
+              onClick={this.fetch}
+            >
+          搜索
+            </Button>
+          </Col>
+          <Col span={2}>
+            <Button
+              className='editable-add-btn'
+              onClick={() => this.setState({visible: true, update: null})}
+            >
           添加
-        </Button>
+            </Button>
+          </Col>
+        </Row>
+
         <ItemForm
           ref={this.saveFormRef}
           visible={visible}
@@ -208,6 +270,8 @@ class Item extends Component {
           dataSource={this.state.data}
           columns={this.columns}
           rowKey='id'
+          pagination={pagination}
+          onChange={this.handlePageChange}
         />
       </div>
     )

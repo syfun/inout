@@ -14,7 +14,7 @@ class LeftMenu extends Component {
         style={{ lineHeight: '64px' }}
       >
         <Menu.Item key='1'>
-          <NavLink to='/'>
+          <NavLink to='/push'>
             <Icon type='pie-chart' />
             <span>入库</span>
           </NavLink>

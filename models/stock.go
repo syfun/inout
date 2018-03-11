@@ -1,5 +1,7 @@
 package models
 
+import "strconv"
+
 // Stock ...
 type Stock struct {
 	ID            int64  `json:"id"`
@@ -15,26 +17,51 @@ type Stock struct {
 	Unit          string `json:"unit"`
 }
 
-func (*Stock) columns() map[string]interface{} {
-	return stringSliceToMap([]string{"id", "item_id", "warehouse", "push", "pop", "now", "desc"})
+// Create ...
+func (s *Stock) Create(t Table) (Table, error) {
+	rst, err := Create("insert into stock (item_id, warehouse, push, pop, now, desc) values (:item_id, :warehouse, :push, :pop, :now, :desc);", t)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := rst.LastInsertId()
+	var stock Stock
+	err = s.Get(&stock, NewDBQuery(nil, map[string]string{"id": strconv.FormatInt(id, 10)}))
+	return &stock, err
 }
 
-func (*Stock) insertStmt() string {
-	return `insert into stock (item_id, warehouse, push, pop, now, desc) values (:item_id, :warehouse, :push, :pop, :now, :desc);`
+var stockCols = stringSliceToMap("stock", []string{
+	"id", "item_id", "warehouse", "push", "pop", "now", "desc",
+})
+
+// Update ..
+func (s *Stock) Update(query *DBQuery, data map[string]interface{}) (Table, error) {
+	err := Update("update stock set %s where id=:id", query, data, stockCols)
+	if err != nil {
+		return nil, err
+	}
+	var stock Stock
+	err = s.Get(&stock, query)
+	return &stock, err
 }
 
-func (*Stock) getStmt() string {
-	return `select stock.id as id, item_id, warehouse, warehouse, stock.push as push, stock.pop as pop, stock.now as now, stock.desc as desc, name, type, specification, unit from stock left outer join item on stock.item_id=item.id where stock.id=?`
+var stockSelect = `select stock.id, item_id, warehouse, warehouse, stock.push as push, stock.pop as pop, stock.now as now, stock.desc as desc, name, type, specification, unit from stock left outer join item on stock.item_id=item.id`
+
+// Get ...
+func (*Stock) Get(dest interface{}, query *DBQuery) error {
+	return Get(dest, stockSelect+" where stock.id=?", query)
 }
 
-func (*Stock) allStmt() string {
-	return `select stock.id as id, item_id, warehouse, warehouse, stock.push as push, stock.pop as pop, stock.now as now, stock.desc as desc, name, type, specification, unit from stock left outer join item on stock.item_id=item.id`
+// List ...
+func (*Stock) List(dest interface{}, query *DBQuery) (int64, error) {
+	cols := MergeMap(itemCols, stockCols)
+	err := List(dest, stockSelect, query, cols)
+	if err != nil {
+		return 0, err
+	}
+	return Count("select count(*) from stock left outer join item on stock.item_id=item.id", query, cols)
 }
 
-func (*Stock) updateStmt() string {
-	return "update stock"
-}
-
-func (*Stock) deleteStmt() string {
-	return "delete from stock where id=?"
+// Delete ...
+func (*Stock) Delete(query *DBQuery) error {
+	return Delete("delete from stock", query)
 }

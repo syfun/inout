@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"strconv"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/syfun/inout/models"
@@ -161,7 +162,7 @@ func (r *Router) Patch(path string, handler httpHandler) {
 
 // RestController is restful api controller.
 type RestController struct {
-	Model   *models.Model
+	Table   models.Table
 	Name    string
 	Options []string
 }
@@ -187,11 +188,11 @@ func (rest *RestController) Create(w http.ResponseWriter, r *http.Request) (Resp
 	if err != nil {
 		return nil, &httpError{err, "cannot get http body", 500}
 	}
-	resource := reflect.New(reflect.TypeOf(rest.Model.Table).Elem()).Elem().Addr()
+	resource := reflect.New(reflect.TypeOf(rest.Table).Elem())
 	if err = json.Unmarshal(body, resource.Interface()); err != nil {
 		return nil, &httpError{err, "cannot parse body", 400}
 	}
-	res, err := rest.Model.Insert(resource.Interface())
+	res, err := rest.Table.Create(resource.Interface().(models.Table))
 	if err != nil {
 		return nil, &httpError{err, "", 500}
 	}
@@ -200,20 +201,25 @@ func (rest *RestController) Create(w http.ResponseWriter, r *http.Request) (Resp
 
 // Get get one resource.
 func (rest *RestController) Get(w http.ResponseWriter, r *http.Request) (Response, error) {
-	resource, err := rest.Model.Get(models.NewDBQuery(nil, map[string]string{"id": getParams(r).ByName("id")}))
+	resource := reflect.New(reflect.TypeOf(rest.Table).Elem())
+	err := rest.Table.Get(
+		resource.Interface(),
+		models.NewDBQuery(nil, map[string]string{"id": getParams(r).ByName("id")}))
 	if err != nil {
 		return nil, &httpError{err, "", 500}
 	}
-	return &JSONResponse{resource, 200}, nil
+	return &JSONResponse{resource.Interface(), 200}, nil
 }
 
 // All get all resources.
 func (rest *RestController) All(w http.ResponseWriter, r *http.Request) (Response, error) {
-	resources, err := rest.Model.All(models.NewDBQuery(r.URL.Query(), nil))
+	resources := reflect.New(reflect.SliceOf(reflect.TypeOf(rest.Table).Elem()))
+	count, err := rest.Table.List(resources.Interface(), models.NewDBQuery(r.URL.Query(), nil))
 	if err != nil {
 		return nil, &httpError{err, "", 500}
 	}
-	return &JSONResponse{resources, 200}, nil
+	w.Header().Set("Total", strconv.FormatInt(count, 10))
+	return &JSONResponse{resources.Interface(), 200}, nil
 }
 
 // Update update one resource.
@@ -230,7 +236,7 @@ func (rest *RestController) Update(w http.ResponseWriter, r *http.Request) (Resp
 		return nil, &httpError{errors.New("body has no content"), "", 400}
 	}
 	query := models.NewDBQuery(nil, map[string]string{"id": getParams(r).ByName("id")})
-	resource, err := rest.Model.Update(query, data)
+	resource, err := rest.Table.Update(query, data)
 	if err != nil {
 		return nil, &httpError{err, "", 500}
 	}
@@ -239,7 +245,7 @@ func (rest *RestController) Update(w http.ResponseWriter, r *http.Request) (Resp
 
 // Delete delete one resource.
 func (rest *RestController) Delete(w http.ResponseWriter, r *http.Request) (Response, error) {
-	err := rest.Model.Delete(models.NewDBQuery(nil, map[string]string{"id": getParams(r).ByName("id")}))
+	err := rest.Table.Delete(models.NewDBQuery(nil, map[string]string{"id": getParams(r).ByName("id")}))
 	if err != nil {
 		return nil, &httpError{err, "", 500}
 	}

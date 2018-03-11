@@ -1,110 +1,348 @@
 import React, { Component } from 'react'
+import { Table, Input, Button, Popconfirm, InputNumber, Form, Modal, Select, Row, Col } from 'antd'
+import axios from 'axios'
+import Selectx from './Selectx'
 
-import { Table, Input, Popconfirm } from 'antd'
+const FormItem = Form.Item
+const Option = Select.Option
 
-const data = []
-for (let i = 0; i < 100; i++) {
-  data.push({
-    key: i.toString(),
-    name: `Edrward ${i}`,
-    age: 32,
-    address: `London Park no. ${i}`
-  })
-}
-
-const EditableCell = ({ editable, value, onChange }) => (
-  <div>
-    {editable
-      ? <Input style={{ margin: '-5px 0' }} value={value} onChange={e => onChange(e.target.value)} />
-      : value
+const PopForm = Form.create()(
+  (props) => {
+    const { visible, onCancel, onOK, update, form, handleSelectChange, items } = props
+    const { getFieldDecorator } = form
+    const formItemLayout = {
+      labelCol: { span: 4 },
+      wrapperCol: { span: 14 }
     }
-  </div>
+    return (
+      <Modal
+        visible={visible}
+        title={update ? '更新' : '创建'}
+        okText={update ? '更新' : '创建'}
+        onCancel={onCancel}
+        onOk={onOK}
+        cancelText='取消'
+      >
+        <Form layout='horizontal'>
+          <FormItem label='物品' {...formItemLayout}>
+            {getFieldDecorator('name', {
+              initialValue: update ? update.name : '',
+              rules: [{
+                required: true, message: '请选择物品！'
+              }]
+            })(
+              <Select onChange={handleSelectChange}>
+                {
+                  items.map(item => <Option key={item.id}>{item.name}</Option>)
+                }
+              </Select>
+            )}
+          </FormItem>
+          <FormItem label='物品分类' {...formItemLayout}>
+            {getFieldDecorator('type', {initialValue: update ? update.type : ''})(
+              <Input />
+            )}
+          </FormItem>
+          <FormItem label='物品规格' {...formItemLayout}>
+            {getFieldDecorator('specification', {initialValue: update ? update.specification : ''})(
+              <Input />
+            )}
+          </FormItem>
+          <FormItem label='单位' {...formItemLayout}>
+            {getFieldDecorator('unit', {initialValue: update ? update.unit : ''})(
+              <Input />
+            )}
+          </FormItem>
+          <FormItem label='摘要' {...formItemLayout}>
+            {getFieldDecorator('abstract', {initialValue: update ? update.abstract : ''})(
+              <Input />
+            )}
+          </FormItem>
+          <FormItem label='仓库' {...formItemLayout}>
+            {getFieldDecorator('warehouse', {
+              initialValue: update ? update.warehouse : '',
+              rules: [
+                {
+                  required: true, message: '请选择仓库！'
+                }
+              ]
+            })(
+              <Selectx url='/labels?type=warehouse' />
+            )}
+          </FormItem>
+          <FormItem label='出库数量' {...formItemLayout}>
+            {getFieldDecorator('number', {initialValue: update ? update.number : 0})(
+              <InputNumber min={0} />
+            )}
+          </FormItem>
+          <FormItem label='领取人' {...formItemLayout}>
+            {getFieldDecorator('receiver', {initialValue: update ? update.receiver : ''})(
+              <Selectx url='/labels?type=user' />
+            )}
+          </FormItem>
+          <FormItem label='审核人' {...formItemLayout}>
+            {getFieldDecorator('checker', {initialValue: update ? update.checker : ''})(
+              <Selectx url='/labels?type=user' />
+            )}
+          </FormItem>
+          <FormItem label='备注' {...formItemLayout}>
+            {getFieldDecorator('remark', {initialValue: update ? update.remark : ''})(
+              <Input />
+            )}
+          </FormItem>
+          <FormItem label='item_id' style={{display: 'none'}}>
+            {getFieldDecorator('item_id')(
+              <Input />
+            )}
+          </FormItem>
+        </Form>
+      </Modal>
+    )
+  }
 )
 
-class Label extends Component {
-  constructor (props) {
-    super(props)
-    this.columns = [{
-      title: 'name',
-      dataIndex: 'name',
-      // width: '25%',
-      render: (text, record) => this.renderColumns(text, record, 'name')
+class Pop extends Component {
+  state = {
+    data: [],
+    visible: false,
+    update: null,
+    items: [],
+    pagination: {},
+    filter: {}
+  }
+
+  columns = [
+    {
+      title: '物品名称',
+      dataIndex: 'name'
     }, {
-      title: 'operation',
-      dataIndex: 'operation',
+      title: '物品分类',
+      dataIndex: 'type'
+    }, {
+      title: '物品规格',
+      dataIndex: 'specification'
+    }, {
+      title: '单位',
+      dataIndex: 'unit'
+    }, {
+      title: '摘要',
+      dataIndex: 'abstract'
+    }, {
+      title: '出库数量',
+      dataIndex: 'number'
+    }, {
+      title: '仓库',
+      dataIndex: 'warehouse'
+    }, {
+      title: '领取人',
+      dataIndex: 'receiver'
+    }, {
+      title: '审核人',
+      dataIndex: 'checker'
+    }, {
+      title: '备注',
+      dateIndex: 'remark'
+    }, {
+      title: '操作',
       render: (text, record) => {
-        const { editable } = record
         return (
-          <div className='editable-row-operations'>
-            {
-              editable
-                ? <span>
-                  <a onClick={() => this.save(record.key)}>Save</a>
-                  <Popconfirm title='Sure to cancel?' onConfirm={() => this.cancel(record.key)}>
-                    <a>Cancel</a>
-                  </Popconfirm>
-                </span>
-                : <a onClick={() => this.edit(record.key)}>Edit</a>
-            }
+          <div>
+            <Button
+              type='primary'
+              style={{ marginRight: '5px' }}
+              onClick={() => this.setState({visible: true, update: record})}
+            >
+              编辑
+            </Button>
+            <Popconfirm
+              placement='bottomLeft'
+              title='确定删除吗？'
+              onConfirm={() => this.handleDelete(record.id)}
+              okText='确定' cancelText='取消'
+            >
+              <Button>删除</Button>
+            </Popconfirm>
           </div>
         )
       }
-    }]
-    this.state = { data }
-    this.cacheData = data.map(item => ({ ...item }))
+    }
+  ]
+
+  componentDidMount () {
+    this.fetch()
+
+    axios.get('/items').then(res => {
+      this.setState({items: res.data || []})
+    })
   }
-  renderColumns (text, record, column) {
-    return (
-      <EditableCell
-        editable={record.editable}
-        value={text}
-        onChange={value => this.handleChange(value, record.key, column)}
-      />
+
+  fetch = () => {
+    axios.get('/pops?page=1&page_size=10', {
+      params: this.state.filter
+    }).then(res => {
+      this.setState({
+        data: res.data || [],
+        pagination: {
+          pageSize: 10,
+          total: parseInt(res.headers.total, 10),
+          showTotal: total => `共 ${res.headers.total} 条`
+        }
+      })
+    })
+  }
+
+  setFilter = (key, value) => {
+    const filter = this.state.filter
+    if (value === '') {
+      delete filter[key]
+    } else {
+      Object.assign(filter, {[key]: value})
+    }
+    this.setState(filter)
+  }
+
+  handlePageChange = (pagination, filters, sorter) => {
+    const pager = this.state.pagination
+    pager.current = pagination.current
+    axios.get(`/pops?page=${pager.current}&page_size=${pager.pageSize}`).then(
+      res => {
+        this.setState({
+          data: res.data || [],
+          pagination: pager
+        })
+      }
     )
   }
-  handleChange (value, key, column) {
-    const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.key)[0]
-    if (target) {
-      target[column] = value
-      this.setState({ data: newData })
-    }
+
+  handleSelectChange = (value) => {
+    const form = this.form
+    const {items} = this.state
+    const target = items.filter(item => item.id === parseInt(value, 10))[0]
+    form.setFieldsValue({
+      type: target.type,
+      unit: target.unit,
+      specification: target.specification,
+      item_id: target.id
+    })
   }
-  edit (key) {
-    const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.key)[0]
-    if (target) {
-      target.editable = true
-      this.setState({ data: newData })
-    }
+
+  handleCancel = () => {
+    this.setState({visible: false})
   }
-  save (key) {
-    const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.key)[0]
-    if (target) {
-      delete target.editable
-      this.setState({ data: newData })
-      this.cacheData = newData.map(item => ({ ...item }))
-    }
+
+  handleCreate = () => {
+    const form = this.form
+    form.validateFields((_, values) => {
+      axios.post('/pops', values).then(
+        res => {
+          let data = [...this.state.data]
+          data.push(res.data)
+          form.resetFields()
+          const pager = this.state.pagination
+          pager.total += 1
+          this.setState({ data, visible: false, pagination: pager })
+        }
+      )
+    })
   }
-  cancel (key) {
-    const newData = [...this.state.data]
-    const target = newData.filter(item => key === item.key)[0]
-    if (target) {
-      Object.assign(target, this.cacheData.filter(item => key === item.key)[0])
-      delete target.editable
-      this.setState({ data: newData })
-    }
+
+  handleUpdate = () => {
+    const form = this.form
+    const itemID = this.state.update.id
+    form.validateFields((_, values) => {
+      axios.patch(`/pops/${itemID}`, values).then(
+        res => {
+          const data = [...this.state.data]
+          const target = data.filter(item => itemID === item.id)[0]
+          Object.assign(target, res.data)
+          form.resetFields()
+          this.setState({ data, visible: false })
+        }
+      )
+    })
   }
+
+  handleDelete = (key) => {
+    axios.delete(`/pops/${key}`).then(
+      res => {
+        let data = [...this.state.data]
+        data = data.filter(item => key !== item.id)
+        this.setState({ data, visible: false })
+      }
+    )
+  }
+
+  showModal = () => {
+    this.setState({visible: true})
+  }
+
+  saveFormRef = (form) => {
+    this.form = form
+  }
+
   render () {
+    const {update, visible, items, pagination} = this.state
     return (
-      <Table
-        bordered
-        dataSource={this.state.data}
-        columns={this.columns}
-      />
+      <div>
+        <Row>
+          <Col span={3} offset={8}>
+            <Input
+              placeholder='物品名称'
+              onChange={(e) => this.setFilter('name', e.target.value)}
+              onPressEnter={() => this.fetch()}
+            />
+          </Col>
+          <Col span={3} offset={1}>
+            <Input
+              placeholder='物品分类'
+              onChange={(e) => this.setFilter('type', e.target.value)}
+              onPressEnter={() => this.fetch()}
+            />
+          </Col>
+          <Col span={3} offset={1}>
+            <Input
+              placeholder='仓库'
+              onChange={(e) => this.setFilter('warehouse', e.target.value)}
+              onPressEnter={() => this.fetch()}
+            />
+          </Col>
+          <Col span={2}>
+            <Button
+              className='editable-add-btn'
+              onClick={this.fetch}
+            >
+          搜索
+            </Button>
+          </Col>
+          <Col span={2}>
+            <Button
+              className='editable-add-btn'
+              onClick={() => this.setState({visible: true, update: null})}
+            >
+          添加
+            </Button>
+          </Col>
+        </Row>
+        <PopForm
+          ref={this.saveFormRef}
+          visible={visible}
+          onCancel={this.handleCancel}
+          onOK={update ? this.handleUpdate : this.handleCreate}
+          update={update}
+          handleSelectChange={this.handleSelectChange}
+          items={items}
+        />
+        <Table
+          bordered
+          dataSource={this.state.data}
+          columns={this.columns}
+          rowKey='id'
+          pagination={pagination}
+          onChange={this.handlePageChange}
+        />
+      </div>
     )
   }
 }
 
-export default Label
+export default Pop

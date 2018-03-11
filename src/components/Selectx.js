@@ -7,7 +7,9 @@ class Selectx extends Component {
   constructor (props) {
     super(props)
     this.state = {
-      data: []
+      data: [],
+      value: props.value || '',
+      field: props.field || 'name'
     }
   }
   componentDidMount () {
@@ -15,14 +17,21 @@ class Selectx extends Component {
       res => this.setState({data: res.data})
     )
   }
+
+  componentWillReceiveProps (nextProps) {
+    // Should be a controlled component.
+    const {field, value} = nextProps
+    this.setState({field: field || 'name', value})
+  }
+
   render () {
-    const {data} = this.state
+    const {data, value, field} = this.state
     return (
       <div>
-        <Select defaultValue={this.props.initialValue} onChange={this.props.onChange}>
+        <Select value={value} onChange={this.props.onChange}>
           {
             data.map(item => (
-              <Option key={item.name}>{item.name}</Option>
+              <Option key={item[field]}>{item.name}</Option>
             ))
           }
         </Select>
