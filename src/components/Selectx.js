@@ -14,7 +14,7 @@ class Selectx extends Component {
   }
   componentDidMount () {
     axios.get(this.props.url).then(
-      res => this.setState({data: res.data})
+      res => this.setState({data: res.data || []})
     )
   }
 

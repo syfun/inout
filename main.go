@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/syfun/inout/models"
@@ -23,6 +22,6 @@ func main() {
 	router.Register(&RestController{&models.Stock{}, "stock", AllOptions})
 	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 
-	router.NotFound = http.FileServer(http.Dir(path.Join(dir, "build"))).ServeHTTP
+	router.NotFound = http.FileServer(http.Dir(dir)).ServeHTTP
 	log.Fatal(http.ListenAndServe(":8000", router))
 }
